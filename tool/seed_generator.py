@@ -9,9 +9,12 @@ import os
 import sqlite3
 import time
 
-DB_PATH = "/home/ubuntu/Badil/assets/database/badil_seed.db"
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+PROJECT_ROOT = os.path.dirname(SCRIPT_DIR)
+DB_PATH = os.path.join(PROJECT_ROOT, "assets", "database", "badil_seed.db")
 
 def build_seed_database():
+    os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
     if os.path.exists(DB_PATH):
         os.remove(DB_PATH)
         print(f"Removed existing {DB_PATH}")
