@@ -1,0 +1,67 @@
+name: Badil Release Build
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Generate Seed Database
+        run: |
+          python3 tool/seed_generator.py
+
+      - name: Install Flutter Dependencies
+        run: |
+          flutter pub get
+
+      - name: Run Tests
+        run: |
+          flutter test
+
+      - name: Build Android ARM64 APK
+        run: |
+          flutter build apk --release --target-platform=android-arm64 --no-tree-shake-icons
+          cp build/app/outputs/flutter-apk/app-release.apk Badil-${{ github.ref_name }}-arm64.apk
+
+      - name: Build Universal Android APK
+        run: |
+          flutter build apk --release --no-tree-shake-icons
+          cp build/app/outputs/flutter-apk/app-release.apk Badil-${{ github.ref_name }}-universal.apk
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            Badil-${{ github.ref_name }}-arm64.apk
+            Badil-${{ github.ref_name }}-universal.apk
+          name: Release ${{ github.ref_name }}
+          generate_release_notes: true
+          draft: false
+          prerelease: false

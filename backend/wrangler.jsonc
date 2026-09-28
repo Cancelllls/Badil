@@ -1,0 +1,19 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "badil-api",
+  "main": "src/index.ts",
+  "compatibility_date": "2025-02-24",
+  "compatibility_flags": [
+    "nodejs_compat"
+  ],
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "badil-db",
+      "database_id": "badil-local-id"
+    }
+  ],
+  "vars": {
+    "ADMIN_PASSWORD": "badil-secure-admin-pass"
+  }
+}

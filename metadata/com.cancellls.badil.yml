@@ -1,0 +1,37 @@
+Categories:
+  - Shopping
+  - Utility
+License: GPL-3.0-or-later
+AuthorName: Abdalrahman Samir
+SourceCode: https://github.com/Cancellls/Badil
+IssueTracker: https://github.com/Cancellls/Badil/issues
+Donate: https://cancellls.com
+
+AutoName: Badil (بَديل)
+Summary: فحص مقاطعة المنتجات واكتشاف البدائل المصرية والعربية 100% بدون إنترنت
+Description: |-
+  **بَديل (Badil)** هو تطبيق مفتوح المصدر ومحلي بالكامل (Offline-First) مصمم لمساعدة المستهلكين في مصر والعالم العربي على فحص باركود المنتجات فوراً والتعرف على موقفها من المقاطعة، مع إبراز وتوصية البدائل المصرية والوطنية المعتمدة بجودة عالية وأسعار منافسة.
+
+  **المميزات الرئيسية:**
+  * **ماسح باركود فائق السرعة:** يعمل بالكامل على الجهاز وبدون اتصال بالإنترنت (Offline) في أقل من 10 ملي ثانية.
+  * **التركيز على البدائل (Badeel-First):** لا نكتفي بإخبارك أن المنتج مقاطعة؛ بل نقترح عليك فوراً 2 إلى 4 بدائل مصرية موثوقة ومجربة مع التقييمات وقصة كل علامة وطنية.
+  * **بحث بالاسم فائق السرعة (FTS5):** محرك بحث داخلي يدعم اللغة العربية بكفاءة عالية حتى داخل طوابق السوبرماركت السفلية التي تنعدم فيها الشبكة.
+  * **مشاركة المجتمع (Crowdsourcing):** إمكانية إرسال باركود المنتجات غير المسجلة واقتراح بدائل جديدة مع الحفظ المحلي التلقائي والمزامنة عند توفر الشبكة.
+  * **دعم الصناعة الوطنية:** مساحة مخصصة لإبراز 'بديل الأسبوع المعتمد' لتشجيع المصانع والمشاريع الوطنية.
+  * **خصوصية تامة 100%:** لا يحتوي التطبيق على أي إعلانات تجسسية أو متتبعات خارجية، ومبني وفقاً لأعلى معايير F-Droid الحرة ومفتوحة المصدر.
+
+RepoType: git
+Repo: https://github.com/Cancellls/Badil.git
+
+Builds:
+  - versionName: 1.0.0
+    versionCode: 1
+    commit: v1.0.0
+    output: build/app/outputs/flutter-apk/app-release.apk
+    srclibs:
+      - flutter@3.49.0
+    prebuild:
+      - flutter config --no-analytics
+      - flutter pub get
+    build:
+      - flutter build apk --release --target-platform=android-arm64
