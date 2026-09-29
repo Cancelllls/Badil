@@ -13,6 +13,11 @@ class CategoryModel {
     required this.sortOrder,
   });
 
+  String localizedName(bool isAr) {
+    if (isAr) return nameAr;
+    return nameEn.trim().isNotEmpty ? nameEn : nameAr;
+  }
+
   factory CategoryModel.fromMap(Map<String, dynamic> map) {
     return CategoryModel(
       id: map['id'] as String,

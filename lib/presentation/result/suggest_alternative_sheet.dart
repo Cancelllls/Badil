@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/localization/locale_controller.dart';
 import '../../data/repositories/crowdsource_repository.dart';
 
 class SuggestAlternativeSheet extends StatefulWidget {
@@ -69,6 +70,7 @@ class _SuggestAlternativeSheetState extends State<SuggestAlternativeSheet> {
     if (!_formKey.currentState!.validate()) return;
 
     setState(() => _isSubmitting = true);
+    final strings = LocaleController.instance.strings;
 
     try {
       await _repository.submitUnknownProduct(
@@ -85,13 +87,14 @@ class _SuggestAlternativeSheetState extends State<SuggestAlternativeSheet> {
       if (mounted) {
         Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
+          SnackBar(
             backgroundColor: AppTheme.primaryGreen,
             content: Text(
-              "شكراً لك! تم حفظ اقتراحك محلياً وسيتم مراجعته وإضافته لقاعدة البيانات.",
-              style: TextStyle(fontWeight: FontWeight.bold),
+              strings.suggestionSubmitted,
+              style: const TextStyle(fontWeight: FontWeight.bold),
             ),
-            duration: Duration(seconds: 4),
+            duration: const Duration(seconds: 4),
+            behavior: SnackBarBehavior.floating,
           ),
         );
       }
@@ -99,7 +102,7 @@ class _SuggestAlternativeSheetState extends State<SuggestAlternativeSheet> {
       if (mounted) {
         setState(() => _isSubmitting = false);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("حدث خطأ أثناء الحفظ: $e")),
+          SnackBar(content: Text("Error: $e")),
         );
       }
     }
@@ -109,9 +112,11 @@ class _SuggestAlternativeSheetState extends State<SuggestAlternativeSheet> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
+    final strings = LocaleController.instance.strings;
+    final textDir = LocaleController.instance.textDirection;
 
     return Directionality(
-      textDirection: TextDirection.rtl,
+      textDirection: textDir,
       child: Container(
         constraints: BoxConstraints(
           maxHeight: MediaQuery.of(context).size.height * 0.9,
@@ -126,7 +131,6 @@ class _SuggestAlternativeSheetState extends State<SuggestAlternativeSheet> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Handle
             Center(
               child: Container(
                 margin: const EdgeInsets.only(top: 12, bottom: 8),
@@ -138,7 +142,6 @@ class _SuggestAlternativeSheetState extends State<SuggestAlternativeSheet> {
                 ),
               ),
             ),
-
             Flexible(
               child: SingleChildScrollView(
                 padding: const EdgeInsets.fromLTRB(20, 10, 20, 24),
@@ -147,29 +150,29 @@ class _SuggestAlternativeSheetState extends State<SuggestAlternativeSheet> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
-                        "اقترح منتجاً أو بديلاً مصرياً 🇪🇬",
-                        style: TextStyle(
+                      Text(
+                        strings.suggestFormTitle,
+                        style: const TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
                       const SizedBox(height: 6),
                       Text(
-                        "ساعد مجتمع بديل في توثيق المنتجات واكتشاف البدائل الوطنية الممتازة.",
+                        LocaleController.instance.isArabic
+                            ? "ساعد مجتمع بديل في توثيق المنتجات واكتشاف البدائل الوطنية."
+                            : "Help the community document products and discover ethical alternatives.",
                         style: TextStyle(
                           fontSize: 13,
                           color: isDark ? Colors.grey[400] : Colors.grey[600],
                         ),
                       ),
                       const SizedBox(height: 18),
-
-                      // Status Selector
                       Row(
                         children: [
                           Expanded(
                             child: _buildChoiceChip(
-                              label: "منتج مقاطعة 🛑",
+                              label: "${strings.statusBoycott} 🛑",
                               selected: _selectedStatus == 'boycott',
                               onSelected: () => setState(() => _selectedStatus = 'boycott'),
                               selectedColor: AppTheme.boycottRed,
@@ -178,7 +181,7 @@ class _SuggestAlternativeSheetState extends State<SuggestAlternativeSheet> {
                           const SizedBox(width: 10),
                           Expanded(
                             child: _buildChoiceChip(
-                              label: "بديل محلي 🟢",
+                              label: "${strings.filterSafeLocal} 🟢",
                               selected: _selectedStatus == 'safe_local',
                               onSelected: () => setState(() => _selectedStatus = 'safe_local'),
                               selectedColor: AppTheme.primaryGreen,
@@ -187,65 +190,51 @@ class _SuggestAlternativeSheetState extends State<SuggestAlternativeSheet> {
                         ],
                       ),
                       const SizedBox(height: 16),
-
-                      // Barcode
                       TextFormField(
                         controller: _barcodeCtrl,
                         keyboardType: TextInputType.number,
-                        decoration: const InputDecoration(
-                          labelText: "رقم الباركود (EAN / Barcode)",
-                          prefixIcon: Icon(Icons.qr_code_rounded),
+                        decoration: InputDecoration(
+                          labelText: strings.barcodeLabel,
+                          prefixIcon: const Icon(Icons.qr_code_rounded),
                         ),
-                        validator: (v) => v == null || v.trim().isEmpty ? "يرجى إدخال الباركود" : null,
                       ),
                       const SizedBox(height: 14),
-
-                      // Product Name
                       TextFormField(
                         controller: _nameCtrl,
-                        decoration: const InputDecoration(
-                          labelText: "اسم المنتج بالعربي",
-                          prefixIcon: Icon(Icons.shopping_bag_outlined),
+                        decoration: InputDecoration(
+                          labelText: strings.productNameField,
+                          prefixIcon: const Icon(Icons.shopping_bag_outlined),
                         ),
-                        validator: (v) => v == null || v.trim().isEmpty ? "يرجى إدخال اسم المنتج" : null,
+                        validator: (v) => v == null || v.trim().isEmpty ? strings.fillRequiredFields : null,
                       ),
                       const SizedBox(height: 14),
-
-                      // Company Name
                       TextFormField(
                         controller: _companyCtrl,
-                        decoration: const InputDecoration(
-                          labelText: "اسم الشركة المصنعة (اختياري)",
-                          prefixIcon: Icon(Icons.business_rounded),
+                        decoration: InputDecoration(
+                          labelText: strings.brandNameField,
+                          prefixIcon: const Icon(Icons.business_rounded),
                         ),
                       ),
                       const SizedBox(height: 14),
-
-                      // Suggested Alternative
                       if (_selectedStatus == 'boycott') ...[
                         TextFormField(
                           controller: _alternativeCtrl,
-                          decoration: const InputDecoration(
-                            labelText: "البديل المصري المقترح",
-                            hintText: "مثال: سبيرو سباتس، أوكسي، تايجر...",
-                            prefixIcon: Icon(Icons.swap_horiz_rounded),
+                          decoration: InputDecoration(
+                            labelText: strings.altNameField,
+                            prefixIcon: const Icon(Icons.swap_horiz_rounded),
                           ),
                         ),
                         const SizedBox(height: 14),
                       ],
-
-                      // Notes
                       TextFormField(
                         controller: _notesCtrl,
                         maxLines: 2,
-                        decoration: const InputDecoration(
-                          labelText: "ملاحظات أو سبب المقاطعة (اختياري)",
-                          prefixIcon: Icon(Icons.notes_rounded),
+                        decoration: InputDecoration(
+                          labelText: strings.notesField,
+                          prefixIcon: const Icon(Icons.notes_rounded),
                         ),
                       ),
                       const SizedBox(height: 22),
-
-                      // Submit Button
                       SizedBox(
                         width: double.infinity,
                         height: 50,
@@ -263,9 +252,9 @@ class _SuggestAlternativeSheetState extends State<SuggestAlternativeSheet> {
                                   height: 24,
                                   child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5),
                                 )
-                              : const Text(
-                                  "إرسال الاقتراح",
-                                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                              : Text(
+                                  strings.submitBtn,
+                                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                                 ),
                         ),
                       ),
@@ -292,10 +281,10 @@ class _SuggestAlternativeSheetState extends State<SuggestAlternativeSheet> {
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 12),
         decoration: BoxDecoration(
-          color: selected ? selectedColor.withOpacity(0.15) : Colors.transparent,
+          color: selected ? selectedColor.withValues(alpha: 0.15) : Colors.transparent,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: selected ? selectedColor : Colors.grey.withOpacity(0.4),
+            color: selected ? selectedColor : Colors.grey.withValues(alpha: 0.4),
             width: selected ? 1.8 : 1,
           ),
         ),

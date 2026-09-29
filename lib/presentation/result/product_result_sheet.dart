@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/localization/locale_controller.dart';
 import '../../data/models/product_model.dart';
 import '../../data/models/alternative_model.dart';
 import '../../data/repositories/product_repository.dart';
@@ -56,21 +57,24 @@ class _ProductResultSheetState extends State<ProductResultSheet> {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
     final isBoycott = widget.product.isBoycott;
+    final isAr = LocaleController.instance.isArabic;
+    final strings = LocaleController.instance.strings;
+    final textDir = LocaleController.instance.textDirection;
 
     return Directionality(
-      textDirection: TextDirection.rtl,
+      textDirection: textDir,
       child: Container(
         constraints: BoxConstraints(
-          maxHeight: MediaQuery.of(context).size.height * 0.88,
+          maxHeight: MediaQuery.of(context).size.height * 0.90,
         ),
         decoration: BoxDecoration(
           color: isDark ? AppTheme.darkSurface : Colors.white,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.3),
-              blurRadius: 20,
-              offset: const Offset(0, -4),
+              color: Colors.black.withValues(alpha: 0.35),
+              blurRadius: 24,
+              offset: const Offset(0, -6),
             )
           ],
         ),
@@ -81,11 +85,11 @@ class _ProductResultSheetState extends State<ProductResultSheet> {
             Center(
               child: Container(
                 margin: const EdgeInsets.only(top: 12, bottom: 8),
-                width: 44,
-                height: 4,
+                width: 48,
+                height: 4.5,
                 decoration: BoxDecoration(
                   color: isDark ? Colors.grey[700] : Colors.grey[300],
-                  borderRadius: BorderRadius.circular(2),
+                  borderRadius: BorderRadius.circular(3),
                 ),
               ),
             ),
@@ -94,15 +98,15 @@ class _ProductResultSheetState extends State<ProductResultSheet> {
             Flexible(
               child: ListView(
                 shrinkWrap: true,
-                padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+                padding: const EdgeInsets.fromLTRB(20, 8, 20, 28),
                 children: [
                   // Status Header Card
-                  _buildStatusHeader(isBoycott, isDark),
+                  _buildStatusHeader(isBoycott, isDark, strings, isAr),
 
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 18),
 
-                  // Product Details
-                  _buildProductInfo(isDark),
+                  // Product Details Card
+                  _buildProductInfo(isDark, strings, isAr),
 
                   const SizedBox(height: 20),
 
@@ -110,20 +114,28 @@ class _ProductResultSheetState extends State<ProductResultSheet> {
                   if (isBoycott) ...[
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
-                        const Text(
-                          "البدائل المصرية المتاحة 🇪🇬",
-                          style: TextStyle(
-                            fontSize: 18,
+                        Text(
+                          strings.verifiedAlternativesTitle,
+                          style: const TextStyle(
+                            fontSize: 17,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
-                        Text(
-                          "${_alternatives.length} بدائل معتمدة",
-                          style: TextStyle(
-                            color: AppTheme.primaryGreen,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 13,
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: AppTheme.primaryGreen.withValues(alpha: 0.15),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Text(
+                            isAr ? "${_alternatives.length} بدائل" : "${_alternatives.length} alternatives",
+                            style: const TextStyle(
+                              color: AppTheme.primaryGreen,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 12,
+                            ),
                           ),
                         ),
                       ],
@@ -133,16 +145,15 @@ class _ProductResultSheetState extends State<ProductResultSheet> {
                       const Center(
                         child: Padding(
                           padding: EdgeInsets.all(24.0),
-                          child: CircularProgressIndicator(),
+                          child: CircularProgressIndicator(color: AppTheme.primaryGreen),
                         ),
                       )
                     else if (_alternatives.isEmpty)
-                      _buildNoAlternativesFound(isDark)
+                      _buildNoAlternativesFound(isDark, strings)
                     else
-                      ..._alternatives.map((alt) => _buildAlternativeCard(alt, isDark)),
+                      ..._alternatives.map((alt) => _buildAlternativeCard(alt, isDark, isAr)),
                   ] else ...[
-                    // If Safe Local Product
-                    _buildSafeLocalBanner(isDark),
+                    _buildSafeLocalBanner(isDark, strings),
                   ],
 
                   const SizedBox(height: 20),
@@ -157,15 +168,15 @@ class _ProductResultSheetState extends State<ProductResultSheet> {
                             SuggestAlternativeSheet.show(
                               context,
                               targetBarcode: widget.product.barcode,
-                              targetProductName: widget.product.nameAr,
+                              targetProductName: widget.product.localizedName(isAr),
                             );
                           },
-                          icon: const Icon(Icons.add_circle_outline, size: 18),
-                          label: const Text("اقترح بديلاً آخر"),
+                          icon: const Icon(Icons.add_circle_outline_rounded, size: 18),
+                          label: Text(strings.suggestAlternativeBtn),
                           style: OutlinedButton.styleFrom(
                             padding: const EdgeInsets.symmetric(vertical: 14),
                             shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
+                              borderRadius: BorderRadius.circular(14),
                             ),
                           ),
                         ),
@@ -173,20 +184,24 @@ class _ProductResultSheetState extends State<ProductResultSheet> {
                       const SizedBox(width: 12),
                       IconButton.filledTonal(
                         onPressed: () {
-                          final altText = _alternatives.map((a) => "• ${a.product.nameAr} (${a.product.companyName})").join("\n");
+                          HapticFeedback.selectionClick();
+                          final altText = _alternatives
+                              .map((a) => "• ${a.product.localizedName(isAr)} (${a.product.companyName})")
+                              .join("\n");
                           final text = widget.product.isBoycott
-                              ? "منتج '${widget.product.nameAr}' مقاطعة! البدائل المصرية المقترحة:\n$altText\n\nتم الفحص عبر تطبيق بديل (Badil) 🇪🇬"
-                              : "منتج '${widget.product.nameAr}' منتج محلي مصري 100%! 🇪🇬\nتم الفحص عبر تطبيق بديل (Badil)";
+                              ? "${strings.statusBoycott}: ${widget.product.localizedName(isAr)}!\n${strings.verifiedAlternativesTitle}:\n$altText\n\n${strings.appName} 🇪🇬"
+                              : "${widget.product.localizedName(isAr)} - ${strings.statusSafeLocal}! 🇪🇬\n${strings.appName}";
                           Clipboard.setData(ClipboardData(text: text));
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text("تم نسخ معلومات المنتج والبدائل بنجاح"),
-                              duration: Duration(seconds: 2),
+                            SnackBar(
+                              content: Text(isAr ? "تم نسخ معلومات المنتج والبدائل" : "Product & alternatives copied!"),
+                              duration: const Duration(seconds: 2),
+                              behavior: SnackBarBehavior.floating,
                             ),
                           );
                         },
-                        icon: const Icon(Icons.copy_rounded),
-                        tooltip: "نسخ التفاصيل",
+                        icon: const Icon(Icons.share_rounded),
+                        tooltip: strings.share,
                       ),
                     ],
                   ),
@@ -199,10 +214,10 @@ class _ProductResultSheetState extends State<ProductResultSheet> {
     );
   }
 
-  Widget _buildStatusHeader(bool isBoycott, bool isDark) {
+  Widget _buildStatusHeader(bool isBoycott, bool isDark, AppStrings strings, bool isAr) {
     final bgColor = isBoycott
-        ? AppTheme.boycottRed.withOpacity(0.12)
-        : AppTheme.primaryGreen.withOpacity(0.12);
+        ? AppTheme.boycottRed.withValues(alpha: 0.12)
+        : AppTheme.primaryGreen.withValues(alpha: 0.12);
     final borderColor = isBoycott ? AppTheme.boycottRed : AppTheme.primaryGreen;
     final iconColor = isBoycott ? AppTheme.boycottRed : AppTheme.primaryGreen;
 
@@ -210,15 +225,15 @@ class _ProductResultSheetState extends State<ProductResultSheet> {
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: bgColor,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: borderColor.withOpacity(0.5), width: 1.5),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: borderColor.withValues(alpha: 0.4), width: 1.5),
       ),
       child: Row(
         children: [
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: iconColor.withOpacity(0.2),
+              color: iconColor.withValues(alpha: 0.18),
               shape: BoxShape.circle,
             ),
             child: Icon(
@@ -227,26 +242,24 @@ class _ProductResultSheetState extends State<ProductResultSheet> {
               size: 28,
             ),
           ),
-          const SizedBox(width: 16),
+          const SizedBox(width: 14),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  isBoycott ? "منتج مقاطعة 🛑" : "منتج محلي 100% مصري 🇪🇬",
+                  isBoycott ? strings.statusBoycott : strings.statusSafeLocal,
                   style: TextStyle(
-                    fontSize: 18,
+                    fontSize: 17,
                     fontWeight: FontWeight.bold,
                     color: iconColor,
                   ),
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: 3),
                 Text(
-                  isBoycott
-                      ? "يدعم جهات غير متوافقة - ننصح باستبداله بالبدائل المحلية"
-                      : "شركة مصرية وطنية - يدعم الاقتصاد المحلي",
+                  isBoycott ? strings.boycottWarningShort : strings.safeLocalShort,
                   style: TextStyle(
-                    fontSize: 13,
+                    fontSize: 12,
                     color: isDark ? Colors.grey[300] : Colors.grey[700],
                   ),
                 ),
@@ -258,24 +271,29 @@ class _ProductResultSheetState extends State<ProductResultSheet> {
     );
   }
 
-  Widget _buildProductInfo(bool isDark) {
+  Widget _buildProductInfo(bool isDark, AppStrings strings, bool isAr) {
+    final reason = widget.product.localizedReason(isAr);
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: isDark ? AppTheme.darkCard : AppTheme.lightCard,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color: isDark ? AppTheme.darkBorder : AppTheme.lightBorder,
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            widget.product.nameAr,
+            widget.product.localizedName(isAr),
             style: const TextStyle(
-              fontSize: 19,
+              fontSize: 18,
               fontWeight: FontWeight.bold,
             ),
           ),
-          if (widget.product.nameEn != null) ...[
+          if (widget.product.nameEn != null && isAr) ...[
             const SizedBox(height: 2),
             Text(
               widget.product.nameEn!,
@@ -286,35 +304,53 @@ class _ProductResultSheetState extends State<ProductResultSheet> {
             ),
           ],
           const SizedBox(height: 12),
-          Row(
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
             children: [
               _buildBadge(Icons.business_rounded, widget.product.companyName, isDark),
-              const SizedBox(width: 8),
               if (widget.product.countryOfOrigin != null)
-                _buildBadge(Icons.public_rounded, "بلد المنشأ: ${widget.product.countryOfOrigin}", isDark),
+                _buildBadge(Icons.public_rounded, "${strings.countryOfOrigin}: ${widget.product.countryOfOrigin}", isDark),
+              if (widget.product.barcode != null)
+                _buildBadge(Icons.qr_code_rounded, widget.product.barcode!, isDark),
             ],
           ),
-          if (widget.product.reasonAr != null && widget.product.isBoycott) ...[
-            const SizedBox(height: 12),
+          if (reason != null && widget.product.isBoycott) ...[
+            const SizedBox(height: 14),
             Container(
-              padding: const EdgeInsets.all(10),
+              padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.red.withOpacity(0.08),
-                borderRadius: BorderRadius.circular(8),
+                color: AppTheme.boycottRed.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: AppTheme.boycottRed.withValues(alpha: 0.2)),
               ),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Icon(Icons.info_outline, size: 16, color: AppTheme.boycottRed),
-                  const SizedBox(width: 8),
+                  const Icon(Icons.info_outline_rounded, size: 18, color: AppTheme.boycottRed),
+                  const SizedBox(width: 10),
                   Expanded(
-                    child: Text(
-                      widget.product.reasonAr!,
-                      style: const TextStyle(
-                        fontSize: 12,
-                        color: AppTheme.boycottRed,
-                        height: 1.4,
-                      ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          strings.boycottReasonTitle,
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: AppTheme.boycottRed,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          reason,
+                          style: TextStyle(
+                            fontSize: 12,
+                            height: 1.4,
+                            color: isDark ? Colors.grey[200] : Colors.grey[800],
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ],
@@ -332,6 +368,7 @@ class _ProductResultSheetState extends State<ProductResultSheet> {
       decoration: BoxDecoration(
         color: isDark ? Colors.black26 : Colors.white,
         borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: isDark ? Colors.white12 : Colors.black12),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -347,128 +384,155 @@ class _ProductResultSheetState extends State<ProductResultSheet> {
     );
   }
 
-  Widget _buildAlternativeCard(AlternativeModel alt, bool isDark) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: isDark ? AppTheme.darkCard : Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: AppTheme.primaryGreen.withOpacity(0.4),
-          width: 1.2,
+  Widget _buildAlternativeCard(AlternativeModel alt, bool isDark, bool isAr) {
+    final note = alt.localizedNote(isAr);
+
+    return InkWell(
+      borderRadius: BorderRadius.circular(16),
+      onTap: () {
+        HapticFeedback.selectionClick();
+        Navigator.pop(context);
+        ProductResultSheet.show(context, alt.product);
+      },
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: isDark ? AppTheme.darkCard : Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: AppTheme.primaryGreen.withValues(alpha: 0.45),
+            width: 1.2,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: AppTheme.primaryGreen.withValues(alpha: 0.05),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
         ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                  color: AppTheme.primaryGreen.withOpacity(0.15),
-                  borderRadius: BorderRadius.circular(10),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: AppTheme.primaryGreen.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Center(
+                    child: Text("🇪🇬", style: TextStyle(fontSize: 22)),
+                  ),
                 ),
-                child: const Center(
-                  child: Text(
-                    "🇪🇬",
-                    style: TextStyle(fontSize: 22),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        alt.product.localizedName(isAr),
+                        style: const TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        alt.product.companyName,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: AppTheme.primaryGreen,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: AppTheme.amberGold.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.star_rounded, size: 16, color: AppTheme.amberGold),
+                      const SizedBox(width: 4),
+                      Text(
+                        alt.rating.toStringAsFixed(1),
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: AppTheme.amberGold,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            if (note != null && note.isNotEmpty) ...[
+              const SizedBox(height: 10),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: isDark ? Colors.black26 : Colors.grey[50],
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  note,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: isDark ? Colors.grey[300] : Colors.grey[700],
+                    height: 1.35,
                   ),
                 ),
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      alt.product.nameAr,
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      alt.product.companyName,
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: AppTheme.primaryGreen,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: AppTheme.amberGold.withOpacity(0.15),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(Icons.star_rounded, size: 16, color: AppTheme.amberGold),
-                    const SizedBox(width: 4),
-                    Text(
-                      alt.rating.toStringAsFixed(1),
-                      style: const TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                        color: AppTheme.amberGold,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
             ],
-          ),
-          if (alt.noteAr != null) ...[
-            const SizedBox(height: 10),
-            Text(
-              alt.noteAr!,
-              style: TextStyle(
-                fontSize: 13,
-                color: isDark ? Colors.grey[300] : Colors.grey[700],
-                height: 1.3,
-              ),
-            ),
           ],
-        ],
+        ),
       ),
     );
   }
 
-  Widget _buildSafeLocalBanner(bool isDark) {
+  Widget _buildSafeLocalBanner(bool isDark, AppStrings strings) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: AppTheme.primaryGreen.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppTheme.primaryGreen.withOpacity(0.3)),
+        color: AppTheme.primaryGreen.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppTheme.primaryGreen.withValues(alpha: 0.3)),
       ),
       child: Column(
         children: [
-          const Icon(Icons.favorite_rounded, color: AppTheme.primaryGreen, size: 36),
+          const Icon(Icons.verified_rounded, color: AppTheme.primaryGreen, size: 40),
           const SizedBox(height: 8),
-          const Text(
-            "شكراً لدعمك المنتج المصري!",
-            style: TextStyle(
+          Text(
+            LocaleController.instance.isArabic
+                ? "شكراً لدعمك الصناعة الوطنية! 🇪🇬"
+                : "Thank you for supporting national industry! 🇪🇬",
+            style: const TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.bold,
               color: AppTheme.primaryGreen,
             ),
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 6),
           Text(
-            "هذا المنتج مصنوع بأيادي مصرية ويدعم الاقتصاد الوطني وتوفير فرص العمل.",
+            LocaleController.instance.isArabic
+                ? "هذا المنتج مصنع بأيادي مصرية وعربية ويساهم مباشرة في تنمية الاقتصاد المستقل."
+                : "This product is manufactured domestically and directly strengthens independent economic growth.",
             textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: 13,
+              height: 1.4,
               color: isDark ? Colors.grey[300] : Colors.grey[700],
             ),
           ),
@@ -477,18 +541,18 @@ class _ProductResultSheetState extends State<ProductResultSheet> {
     );
   }
 
-  Widget _buildNoAlternativesFound(bool isDark) {
+  Widget _buildNoAlternativesFound(bool isDark, AppStrings strings) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: isDark ? AppTheme.darkCard : AppTheme.lightCard,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(14),
       ),
-      child: const Center(
+      child: Center(
         child: Text(
-          "لم يتم تسجيل بدائل معتمدة بعد لهذا المنتج.\nكن أول من يقترح بديلاً محلياً!",
+          strings.noAlternativesFound,
           textAlign: TextAlign.center,
-          style: TextStyle(fontSize: 13, height: 1.4),
+          style: const TextStyle(fontSize: 13, height: 1.4),
         ),
       ),
     );

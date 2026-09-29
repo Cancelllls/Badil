@@ -7,6 +7,7 @@ import '../../data/models/category_model.dart';
 import '../../data/models/product_model.dart';
 import '../../data/models/alternative_model.dart';
 import '../../data/models/pending_submission_model.dart';
+import '../../data/models/country_prefix_model.dart';
 
 class DatabaseHelper {
   static final DatabaseHelper instance = DatabaseHelper._init();
@@ -46,9 +47,39 @@ class DatabaseHelper {
 
     final db = await openDatabase(
       path,
-      version: 1,
+      version: 2,
       onConfigure: (db) async {
         await db.execute('PRAGMA foreign_keys = ON');
+      },
+      onUpgrade: (db, oldVersion, newVersion) async {
+        if (oldVersion < 2) {
+          try {
+            await db.execute('ALTER TABLE products ADD COLUMN reason_en TEXT;');
+          } catch (_) {}
+          try {
+            await db.execute('ALTER TABLE product_alternatives ADD COLUMN note_en TEXT;');
+          } catch (_) {}
+          try {
+            await db.execute('''
+              CREATE TABLE IF NOT EXISTS country_prefixes (
+                prefix TEXT PRIMARY KEY,
+                country_code TEXT NOT NULL,
+                name_ar TEXT NOT NULL,
+                name_en TEXT NOT NULL,
+                flag_emoji TEXT NOT NULL,
+                default_status TEXT NOT NULL
+              );
+            ''');
+          } catch (_) {}
+          try {
+            await db.execute('''
+              CREATE TABLE IF NOT EXISTS app_settings (
+                key TEXT PRIMARY KEY,
+                value TEXT NOT NULL
+              );
+            ''');
+          } catch (_) {}
+        }
       },
     );
 
@@ -111,13 +142,38 @@ class DatabaseHelper {
     return null;
   }
 
-  /// Fetch local Egyptian alternatives for a given boycotted product
+  /// Detect country of origin from barcode using GS1 prefix standard
+  Future<CountryPrefixModel?> getCountryPrefix(String barcode) async {
+    final clean = barcode.trim();
+    if (clean.length < 3) return null;
+
+    final db = await database;
+    final prefix3 = clean.substring(0, 3);
+
+    try {
+      final res = await db.query(
+        'country_prefixes',
+        where: 'prefix = ?',
+        whereArgs: [prefix3],
+        limit: 1,
+      );
+
+      if (res.isNotEmpty) {
+        return CountryPrefixModel.fromMap(res.first);
+      }
+    } catch (_) {}
+
+    return null;
+  }
+
+  /// Fetch local alternatives for a given product
   Future<List<AlternativeModel>> getAlternatives(String productId) async {
     final db = await database;
 
     final query = '''
       SELECT 
         a.note_ar,
+        a.note_en,
         a.rating,
         p.id,
         p.barcode,
@@ -128,6 +184,7 @@ class DatabaseHelper {
         p.category_id,
         p.status,
         p.reason_ar,
+        p.reason_en,
         p.image_url,
         p.is_featured,
         p.created_at
@@ -145,22 +202,33 @@ class DatabaseHelper {
   }
 
   /// Instant search using FTS5 with fallback to wildcard LIKE
-  Future<List<ProductModel>> searchProducts(String query) async {
+  Future<List<ProductModel>> searchProducts(String query, {String? statusFilter}) async {
     final cleanQuery = query.trim();
+    final db = await database;
+
     if (cleanQuery.isEmpty) {
+      if (statusFilter != null && statusFilter.isNotEmpty) {
+        final res = await db.query(
+          'products',
+          where: 'status = ?',
+          whereArgs: [statusFilter],
+          orderBy: 'is_featured DESC, name_ar ASC',
+          limit: 30,
+        );
+        return res.map((m) => ProductModel.fromMap(m)).toList();
+      }
       return getFeaturedProducts();
     }
-
-    final db = await database;
 
     try {
       // 1. Try FTS5 prefix match
       final ftsQuery = '$cleanQuery*';
+      final statusClause = statusFilter != null ? "AND p.status = '$statusFilter'" : '';
       final ftsRes = await db.rawQuery('''
         SELECT p.* FROM products_fts f
         JOIN products p ON f.rowid = p.rowid
-        WHERE products_fts MATCH ?
-        LIMIT 30;
+        WHERE products_fts MATCH ? $statusClause
+        LIMIT 40;
       ''', [ftsQuery]);
 
       if (ftsRes.isNotEmpty) {
@@ -172,24 +240,25 @@ class DatabaseHelper {
 
     // 2. Wildcard fallback
     final likeTerm = '%$cleanQuery%';
+    final statusClause = statusFilter != null ? "AND status = '$statusFilter'" : '';
     final fallbackRes = await db.rawQuery('''
       SELECT * FROM products
-      WHERE name_ar LIKE ? OR name_en LIKE ? OR company_name LIKE ?
+      WHERE (name_ar LIKE ? OR name_en LIKE ? OR company_name LIKE ?) $statusClause
       ORDER BY is_featured DESC, name_ar ASC
-      LIMIT 30;
+      LIMIT 40;
     ''', [likeTerm, likeTerm, likeTerm]);
 
     return fallbackRes.map((m) => ProductModel.fromMap(m)).toList();
   }
 
-  /// Get all categories
+  /// Fetch all categories
   Future<List<CategoryModel>> getCategories() async {
     final db = await database;
     final res = await db.query('categories', orderBy: 'sort_order ASC');
     return res.map((m) => CategoryModel.fromMap(m)).toList();
   }
 
-  /// Get products by category
+  /// Fetch products belonging to a category
   Future<List<ProductModel>> getProductsByCategory(String categoryId) async {
     final db = await database;
     final res = await db.query(
@@ -209,9 +278,37 @@ class DatabaseHelper {
       where: 'is_featured = 1 AND status = ?',
       whereArgs: ['safe_local'],
       orderBy: 'name_ar ASC',
-      limit: 15,
+      limit: 20,
     );
     return res.map((m) => ProductModel.fromMap(m)).toList();
+  }
+
+  /// Settings KV store
+  Future<String?> getSetting(String key) async {
+    final db = await database;
+    try {
+      final res = await db.query(
+        'app_settings',
+        where: 'key = ?',
+        whereArgs: [key],
+        limit: 1,
+      );
+      if (res.isNotEmpty) {
+        return res.first['value'] as String?;
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  Future<void> setSetting(String key, String value) async {
+    final db = await database;
+    try {
+      await db.insert(
+        'app_settings',
+        {'key': key, 'value': value},
+        conflictAlgorithm: ConflictAlgorithm.replace,
+      );
+    } catch (_) {}
   }
 
   /// Insert crowdsourced pending submission
