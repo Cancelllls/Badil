@@ -20,6 +20,8 @@ jobs:
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Set Release Tag
         id: vars
@@ -55,6 +57,20 @@ jobs:
         run: |
           python3 tool/seed_generator.py
 
+      - name: Generate Changelog & Release Notes
+        run: |
+          python3 tool/update_changelog.py ${{ env.RELEASE_TAG }}
+
+      - name: Commit Updated CHANGELOG.md (if changed)
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          if ! git diff --quiet CHANGELOG.md; then
+            git add CHANGELOG.md
+            git commit -m "docs(changelog): update CHANGELOG.md for ${{ env.RELEASE_TAG }} [skip ci]"
+            git push origin HEAD:main
+          fi
+
       - name: Install Flutter Dependencies
         run: |
           flutter pub get
@@ -77,11 +93,11 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ env.RELEASE_TAG }}
+          body_path: RELEASE_NOTES.md
           files: |
             Badil-${{ env.RELEASE_TAG }}-arm64.apk
             Badil-${{ env.RELEASE_TAG }}-universal.apk
           name: Release ${{ env.RELEASE_TAG }}
-          generate_release_notes: true
           draft: false
           prerelease: false
         env:
