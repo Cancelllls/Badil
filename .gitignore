@@ -54,3 +54,6 @@ app.*.map.json
 # Standalone Release APKs
 *.apk
 RELEASE_NOTES.md
+
+# Graphify Knowledge Graph
+graphify-out/
